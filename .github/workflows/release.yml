@@ -1,6 +1,9 @@
 name: Go_Release
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       pppoe_username:
