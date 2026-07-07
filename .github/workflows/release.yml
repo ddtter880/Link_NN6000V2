@@ -60,13 +60,40 @@ jobs:
             powershell* \
             codeql* \
             microsoft* \
+            mono* \
+            erlang* \
             || true
           
           sudo apt-get autoremove -y --purge
           sudo docker system prune -a -f 2>/dev/null || true
           sudo rm -rf /var/lib/apt/lists/*
           
-          echo "=== Disk Space After Cleanup ==="
+          echo "=== Disk Space After apt cleanup ==="
+          df -h
+          
+          # 步骤 1.5: 强制删除 apt 删不掉的大目录（GitHub runner 预装，占空间最大）
+          echo "=== Deep cleanup of non-apt preinstalled blobs ==="
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /opt/hostedtoolcache
+          sudo rm -rf /usr/share/swift
+          sudo rm -rf /opt/microsoft
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/lib/mono
+          sudo rm -rf /usr/lib/erlang
+          sudo rm -rf /usr/local/go
+          sudo rm -rf /usr/share/miniconda
+          sudo rm -rf /opt/pipx
+          sudo rm -rf /usr/share/doc
+          sudo rm -rf "$HOME/.cache" "$HOME/.npm" "$HOME/.cargo/registry"
+          
+          # 删除 GitHub runner 默认的 swap 文件（约 4GB）
+          sudo swapoff -a 2>/dev/null || true
+          sudo rm -f /swapfile
+          
+          echo "=== Disk Space After Deep Cleanup ==="
           df -h
           
           # 步骤 2: 初始化构建环境
@@ -115,7 +142,6 @@ jobs:
         uses: actions/cache/restore@v5.0.4
         with:
           path: |
-            ./action_build/.ccache
             ./action_build/staging_dir
           key: ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}
           restore-keys: |
@@ -203,7 +229,6 @@ jobs:
         uses: actions/cache/save@v5.0.4
         with:
           path: |
-            ./action_build/.ccache
             ./action_build/staging_dir
           key: ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}
 
