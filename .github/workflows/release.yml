@@ -31,6 +31,7 @@ jobs:
     permissions:
       actions: write
       contents: write
+      issues: write
     strategy:
       matrix:
         os: [ubuntu-24.04]
@@ -190,6 +191,37 @@ jobs:
           else
             echo "KVER=unknown" >> $GITHUB_ENV
             echo "manifest 文件不存在"
+          fi
+
+      - name: Report Build Failure (open issue with log)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LOG=build.log
+          {
+            echo "===== 构建失败自动诊断 $(TZ=UTC-8 date +%Y-%m-%d_%H:%M) ====="
+            echo "===== 磁盘空间 ====="
+            df -h || true
+            if [ -f "$LOG" ]; then
+              echo ""
+              echo "===== build.log 总行数: $(wc -l < "$LOG") ====="
+              echo "===== 关键错误行（make/error/failed/空间/权限） ====="
+              grep -nE "make\[[0-9]+\]: \*\*\*|recipe for target .* failed|error:|fatal error:|No space left on device|cannot create|Permission denied|undefined reference" "$LOG" | tail -n 120
+              echo ""
+              echo "===== 末尾 250 行 ====="
+              tail -n 250 "$LOG"
+            else
+              echo "build.log 不存在（make 之前的阶段失败，可能是克隆 / feeds / 脚本阶段）"
+            fi
+          } > /tmp/diag.txt
+          DIAG=$(cat /tmp/diag.txt)
+          EXISTING=$(gh issue list --repo "$GITHUB_REPOSITORY" --label ci-failure --state open --limit 1 --json number --jq '.[0].number // empty' 2>/dev/null || true)
+          BODY=$(printf '自动诊断：Actions 构建失败。\n\n<details><summary>build.log 诊断</summary>\n\n```\n%s\n```\n\n</details>' "$DIAG")
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --repo "$GITHUB_REPOSITORY" --body "$BODY" || true
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "CI 构建失败诊断 $(TZ=UTC-8 date +%Y-%m-%d_%H:%M)" --label ci-failure --body "$BODY" || true
           fi
 
       - name: Cleanup Old Cache

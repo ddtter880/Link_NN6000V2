@@ -139,7 +139,19 @@ fi
 
 if [[ "$Dev" != *"nowifi"* ]]; then
     make download -j$(($(nproc) * 2))
-    make -j$(($(nproc) + 1)) || make -j1 V=s
+    BUILD_LOG="$BASE_PATH/../build.log"
+    : > "$BUILD_LOG"
+    make -j$(($(nproc) + 1)) 2>&1 | tee -a "$BUILD_LOG"
+    rc=${PIPESTATUS[0]}
+    if [ "$rc" -ne 0 ]; then
+        echo "=== 并行编译失败，切换单线程详细模式 (V=s) ===" | tee -a "$BUILD_LOG"
+        make -j1 V=s 2>&1 | tee -a "$BUILD_LOG"
+        rc=${PIPESTATUS[0]}
+    fi
+    if [ "$rc" -ne 0 ]; then
+        echo "BUILD FAILED (rc=$rc) — 详见 build.log 与 CI 失败 issue" | tee -a "$BUILD_LOG"
+        exit "$rc"
+    fi
 fi
 
 if [[ -d action_build ]]; then
@@ -178,7 +190,16 @@ if [[ "$Dev" != *"nowifi"* ]]; then
     make defconfig
     
     echo "编译无 WiFi 版本..."
-    make -j$(($(nproc) + 1)) || make -j1 V=s
+    make -j$(($(nproc) + 1)) 2>&1 | tee -a "$BUILD_LOG"
+    rc=${PIPESTATUS[0]}
+    if [ "$rc" -ne 0 ]; then
+        make -j1 V=s 2>&1 | tee -a "$BUILD_LOG"
+        rc=${PIPESTATUS[0]}
+    fi
+    if [ "$rc" -ne 0 ]; then
+        echo "NO-WIFI BUILD FAILED (rc=$rc)" | tee -a "$BUILD_LOG"
+        exit "$rc"
+    fi
     
     echo "复制固件..."
     find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" \) | while read -r file; do
