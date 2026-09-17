@@ -21,7 +21,10 @@ fi
 
 FEEDS_CONF="feeds.conf.default"
 GOLANG_REPO="https://github.com/sbwml/packages_lang_golang"
-GOLANG_BRANCH="26.x"
+# 改为 27.x：提供 Go 1.27.x，满足 xray-core 26.9.9 的 go.mod 要求 (go >= 1.27)。
+# 旧版 26.x 钉的是 Go 1.26.8，会被 xray-core 的 go build 直接拒掉。
+# 如需可复现构建，可把 27.x 换成该分支上某个具体 commit。
+GOLANG_BRANCH="27.x"
 THEME_SET="argon"
 LAN_ADDR="10.0.0.1"
 
